@@ -1,0 +1,99 @@
+service: express-serverless
+
+frameworkVersion: "2"
+
+package:
+  exclude:
+    - package.json
+    - package-lock.json
+
+plugins:
+  - serverless-iam-roles-per-function
+  - serverless-export-env
+
+custom:
+  stage: ${opt:stage, "dev"}
+  region: ${opt:region, "ap-southeast-2"}
+
+provider:
+  name: aws
+  runtime: nodejs14.x
+  lambdaHashingVersion: 20201221
+  stage: ${self:custom.stage}
+  region: ${self:custom.region}
+  environment:
+    REGION: ${self:custom.region}
+    STAGE: ${self:custom.stage}
+    AWS_NODEJS_CONNECTION_REUSE_ENABLED: "1"
+
+functions:
+  ExpressServerless:
+    handler: ./src/express-serverless.handler
+    environment:
+      ITEMS_TABLE: !Ref ItemsTable
+      COGNITO_USER_POOL_ID: !Ref CognitoUserPool
+      COGNITO_WEB_CLIENT_ID: !Ref CognitoUserPoolWebClient
+    iamRoleStatements:
+      - Effect: Allow
+        Action: dynamodb:PutItem
+        Resource: !GetAtt ItemsTable.Arn
+      - Effect: Allow
+        Action: cognito-idp:ListUsers
+        Resource: !GetAtt CognitoUserPool.Arn
+
+resources:
+  Resources:
+    ItemsTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        BillingMode: PAY_PER_REQUEST
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+        Tags:
+          - Key: Environment
+            Value: ${self:custom.stage}
+          - Key: Name
+            Value: users-table
+
+    CognitoUserPool:
+      Type: AWS::Cognito::UserPool
+      Properties:
+        AutoVerifiedAttributes:
+          - email
+        AccountRecoverySetting:
+          RecoveryMechanisms:
+            - Name: admin_only
+              Priority: 1
+        MfaConfiguration: "OFF"
+        Policies:
+          PasswordPolicy:
+            MinimumLength: 6
+            RequireLowercase: false
+            RequireNumbers: false
+            RequireUppercase: false
+            RequireSymbols: false
+        UsernameAttributes:
+          - email
+        Schema:
+          - AttributeDataType: String
+            Name: name
+            Required: false
+            Mutable: true
+        UserPoolTags:
+          Environment: ${self:custom.stage}
+          Name: ${self:service}
+
+    CognitoUserPoolWebClient:
+      Type: AWS::Cognito::UserPoolClient
+      Properties:
+        UserPoolId: !Ref CognitoUserPool
+        ClientName: web
+        ExplicitAuthFlows:
+          - ALLOW_USER_SRP_AUTH
+          - ALLOW_USER_PASSWORD_AUTH
+          - ALLOW_REFRESH_TOKEN_AUTH
+        PreventUserExistenceErrors: ENABLED
