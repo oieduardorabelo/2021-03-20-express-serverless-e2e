@@ -1,8 +1,8 @@
 let supertest = require("supertest");
 
-let given = require("../config/given");
+let given = require("../../helpers/given");
 
-let { server } = require("./server");
+let { server } = require("../../../server");
 
 test("GET /", async () => {
   let req = await supertest(server).get("/");

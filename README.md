@@ -21,7 +21,7 @@ AWS_PROFILE=<your-profile> sls:export-env
 Run End-to-End (E2E) tests:
 
 ```bash
-AWS_PROFILE=<your-profile> npm test
+AWS_PROFILE=<your-profile> npm run test:e2e
 ```
 
 **NOTE:** You don't need to set `AWS_PROFILE` every time. If you have the correct credentials globally in your terminal session, you can ignore/remove it.

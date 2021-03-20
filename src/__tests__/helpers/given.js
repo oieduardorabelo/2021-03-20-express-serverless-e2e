@@ -69,7 +69,7 @@ async function anItemsTableWith({ count }) {
   return {
     data: items,
     teardown: async () => {
-      let tearItems = items.map((item) => async () => {
+      let tearItems = items.map(async (item) => {
         let params = {
           TableName: ITEMS_TABLE,
           Key: {

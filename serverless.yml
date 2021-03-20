@@ -1,6 +1,7 @@
 service: express-serverless
 
 frameworkVersion: "2"
+configValidationMode: error
 
 package:
   exclude:
@@ -8,12 +9,18 @@ package:
     - package-lock.json
 
 plugins:
-  - serverless-iam-roles-per-function
   - serverless-export-env
+  - serverless-manifest-plugin
+  - serverless-iam-roles-per-function
 
 custom:
   stage: ${opt:stage, "dev"}
   region: ${opt:region, "ap-southeast-2"}
+  manifest:
+    postProcess: ./config/process-serverless-manifest-plugin.js
+    disablePostDeployGeneration: true
+    disableOutput: true
+    silent: true
 
 provider:
   name: aws
@@ -21,21 +28,32 @@ provider:
   lambdaHashingVersion: 20201221
   stage: ${self:custom.stage}
   region: ${self:custom.region}
+  apiGateway:
+    shouldStartNameWithService: true
   environment:
-    REGION: ${self:custom.region}
     STAGE: ${self:custom.stage}
     AWS_NODEJS_CONNECTION_REUSE_ENABLED: "1"
 
 functions:
   ExpressServerless:
     handler: ./src/express-serverless.handler
+    events:
+      - http:
+          path: /
+          method: ANY
+      - http:
+          path: /{proxy+}
+          method: ANY
     environment:
       ITEMS_TABLE: !Ref ItemsTable
       COGNITO_USER_POOL_ID: !Ref CognitoUserPool
       COGNITO_WEB_CLIENT_ID: !Ref CognitoUserPoolWebClient
     iamRoleStatements:
       - Effect: Allow
-        Action: dynamodb:PutItem
+        Action:
+          - dynamodb:PutItem
+          - dynamodb:GetItem
+          - dynamodb:DeleteItem
         Resource: !GetAtt ItemsTable.Arn
       - Effect: Allow
         Action: cognito-idp:ListUsers
@@ -62,8 +80,7 @@ resources:
     CognitoUserPool:
       Type: AWS::Cognito::UserPool
       Properties:
-        AutoVerifiedAttributes:
-          - email
+        AutoVerifiedAttributes: []
         AccountRecoverySetting:
           RecoveryMechanisms:
             - Name: admin_only
@@ -97,3 +114,7 @@ resources:
           - ALLOW_USER_PASSWORD_AUTH
           - ALLOW_REFRESH_TOKEN_AUTH
         PreventUserExistenceErrors: ENABLED
+
+  Outputs:
+    AwsRegion:
+      Value: ${self:custom.region}
